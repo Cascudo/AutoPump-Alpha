@@ -1,3 +1,4 @@
+/* src/styles/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,11 +9,18 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
     Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
-  background-image: radial-gradient(
-    circle farthest-side at 50% 100%,rgba(1, 9, 18, 0),
-    rgba(1, 6, 14, 0.6) 36%,
-    rgba(1, 14, 29, 0.6) 55%,
-    rgba(49, 18, 93, 0.4));
+    
+  /* Clean background matching ALPHA branding */
+  background: linear-gradient(135deg, #111827 0%, #000000 50%, #1f2937 100%);
+  min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  width: 100%;
+}
+
+/* Ensure all containers respect viewport width */
+#__next {
+  width: 100%;
+  overflow-x: hidden;
 }
 
 a {
@@ -24,8 +32,68 @@ a {
   box-sizing: border-box;
 }
 
-/* example: override wallet button style */
-.wallet-adapter-button:not([disabled]):hover {
-  background-color: #707070;
+/* Prevent any element from causing horizontal overflow */
+.container {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
+/* ALPHA Club wallet button styling */
+.wallet-adapter-button {
+  background: linear-gradient(135deg, #0d9488 0%, #06b6d4 100%) !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%) !important;
+  transform: scale(1.02) !important;
+}
+
+.wallet-adapter-button:not([disabled]):focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.5) !important;
+}
+
+/* Ensure long addresses don't cause overflow */
+.font-mono {
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Custom scrollbar for ALPHA theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #0d9488, #06b6d4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #0f766e, #0891b2);
+}
+
+/* Hide horizontal scrollbar but keep functionality */
+::-webkit-scrollbar:horizontal {
+  display: none;
+}
+
+/* Ensure responsive design works properly */
+@media (max-width: 640px) {
+  .wallet-adapter-button {
+    font-size: 0.875rem !important;
+    padding: 0.5rem 1rem !important;
+  }
+}
