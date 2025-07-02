@@ -198,7 +198,7 @@ class BlockchainDataService {
 
             // Try direct parsing first (no RPC call)
             try {
-              const accountData = AccountLayout.decode(account.account.data);
+              const accountData = AccountLayout.decode(new Uint8Array(account.account.data));
               const balance = Number(accountData.amount) / 1e6; // ALPHA has 6 decimals
               
               if (balance >= this.MIN_BALANCE_THRESHOLD) {
