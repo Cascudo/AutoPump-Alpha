@@ -1,5 +1,5 @@
+//utils/explorer.tc
 import { PublicKey, Transaction } from '@solana/web3.js'
-import base58 from 'bs58'
 
 export function getExplorerUrl(
     endpoint: string,
