@@ -88,7 +88,7 @@ const tokenAccountInfo = await Promise.race([
 
 if (tokenAccountInfo && tokenAccountInfo.data) {
             try {
-              const tokenAccount = AccountLayout.decode(tokenAccountInfo.data);
+              const tokenAccount = AccountLayout.decode(Buffer.from(tokenAccountInfo.data));
               const mint = new PublicKey(tokenAccount.mint);
               
               // Verify it's a WSOL token account
