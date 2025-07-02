@@ -2,16 +2,12 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import { FC, useState, useEffect, useCallback } from 'react';
-import { useConnection } from '@solana/wallet-adapter-react';
 import { googleSheetsService } from '../utils/googleSheetsService';
-import { BlockchainDataService } from '../utils/blockchainDataService';
-import { ALPHA_MINT } from '../stores/useAlphaTokenStore';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import Link from 'next/link';
 
 interface BurnData {
   totalTokensBurned: number;
-  totalUsdValueBurned: number;
   recentBurns: Array<{
     amount: number;
     date: string;
@@ -24,18 +20,8 @@ interface BurnData {
   } | null;
 }
 
-interface SupplyData {
-  totalSupply: number;
-  circulatingSupply: number;
-  lockedSupply: number;
-  burnedTokens: number;
-}
-
 const BurnsView: FC = () => {
-  const { connection } = useConnection();
-  const [selectedTimeframe, setSelectedTimeframe] = useState('30d');
   const [burnData, setBurnData] = useState<BurnData | null>(null);
-  const [supplyData, setSupplyData] = useState<SupplyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
@@ -71,28 +57,14 @@ const BurnsView: FC = () => {
   const fetchBurnData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch burn data from Google Sheets
+      // Fetch burn data from Google Sheets - same as homepage
       const stats = await googleSheetsService.getStatsData();
       
-      // Fetch blockchain data
-      const blockchainService = new BlockchainDataService(connection);
-      const analytics = await blockchainService.getTokenAnalytics(ALPHA_MINT);
-      const lockedInfo = await blockchainService.verifyLockedTokens();
-
-      // Set burn data - using safe property access
+      // Set burn data directly from stats
       setBurnData({
         totalTokensBurned: stats.totalTokensBurned || 0,
-        totalUsdValueBurned: (stats as any).totalUsdValueBurned || 0, // Safe access for optional property
         recentBurns: stats.recentBurns || [],
         latestBurn: stats.latestBurn || null
-      });
-
-      // Set supply data
-      setSupplyData({
-        totalSupply: analytics.totalSupply,
-        circulatingSupply: Math.max(0, analytics.totalSupply - lockedInfo.lockedAmount - (stats.totalTokensBurned || 0)),
-lockedSupply: lockedInfo.lockedAmount,
-        burnedTokens: stats.totalTokensBurned || 0
       });
 
       setLastUpdated(new Date().toLocaleTimeString());
@@ -102,10 +74,14 @@ lockedSupply: lockedInfo.lockedAmount,
     } finally {
       setIsLoading(false);
     }
-  }, [connection]);
+  }, []);
 
   useEffect(() => {
     fetchBurnData();
+    
+    // Auto-refresh every 30 seconds like the homepage
+    const interval = setInterval(fetchBurnData, 30000);
+    return () => clearInterval(interval);
   }, [fetchBurnData]);
 
   if (isLoading) {
@@ -116,7 +92,12 @@ lockedSupply: lockedInfo.lockedAmount,
     );
   }
 
-  const burnPercentage = supplyData ? ((burnData?.totalTokensBurned || 0) / supplyData.totalSupply) * 100 : 0;
+  // Calculate burn percentage assuming 1B total supply
+  const TOTAL_SUPPLY = 1000000000; // 1 billion
+  const DEV_LOCKED = 100000000; // 100 million
+  const burnPercentage = ((burnData?.totalTokensBurned || 0) / TOTAL_SUPPLY) * 100;
+  const circulatingSupply = TOTAL_SUPPLY - DEV_LOCKED - (burnData?.totalTokensBurned || 0);
+  
   const avgDailyBurn = burnData && burnData.recentBurns.length > 0 
     ? burnData.recentBurns.reduce((sum, burn) => sum + burn.amount, 0) / burnData.recentBurns.length 
     : 0;
@@ -152,7 +133,7 @@ lockedSupply: lockedInfo.lockedAmount,
               <div className="flex items-center space-x-4">
                 <div className="text-right">
                   <div className="text-2xl font-bold text-green-400">
-                    {supplyData ? formatNumber(supplyData.lockedSupply) : 'Loading...'}
+                    {formatNumber(DEV_LOCKED)}
                   </div>
                   <div className="text-sm text-gray-400">Tokens Locked</div>
                 </div>
@@ -187,16 +168,13 @@ lockedSupply: lockedInfo.lockedAmount,
 
           <div className="bg-gradient-to-br from-red-600/20 to-pink-600/20 rounded-2xl p-6 border border-red-500/20">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">USD Value</h3>
-              <div className="text-2xl">💰</div>
+              <h3 className="text-lg font-semibold text-white">Burn Events</h3>
+              <div className="text-2xl">📊</div>
             </div>
             <div className="text-3xl font-bold text-red-400 mb-1">
-              {burnData && burnData.totalUsdValueBurned > 0 
-                ? `$${burnData.totalUsdValueBurned.toFixed(2)}` 
-                : 'TBD'
-              }
+              {burnData ? burnData.recentBurns.length : '0'}
             </div>
-            <div className="text-sm text-gray-400">Total Burned Value</div>
+            <div className="text-sm text-gray-400">Total Burns</div>
           </div>
 
           <div className="bg-gradient-to-br from-purple-600/20 to-blue-600/20 rounded-2xl p-6 border border-purple-500/20">
@@ -212,13 +190,13 @@ lockedSupply: lockedInfo.lockedAmount,
 
           <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 rounded-2xl p-6 border border-green-500/20">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Recent Average</h3>
+              <h3 className="text-lg font-semibold text-white">Average Burn</h3>
               <div className="text-2xl">⚡</div>
             </div>
             <div className="text-3xl font-bold text-green-400 mb-1">
-              {avgDailyBurn > 0 ? formatNumber(avgDailyBurn) : 'TBD'}
+              {avgDailyBurn > 0 ? formatNumber(avgDailyBurn) : '0'}
             </div>
-            <div className="text-sm text-gray-400">Per Burn Event</div>
+            <div className="text-sm text-gray-400">Per Event</div>
           </div>
         </div>
 
@@ -230,47 +208,43 @@ lockedSupply: lockedInfo.lockedAmount,
               Token Supply Breakdown
             </h2>
             
-            {supplyData && (
-              <div className="grid md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-400 mb-2">Total Supply</div>
-                  <div className="text-2xl font-bold text-white">
-                    {formatNumber(supplyData.totalSupply)}
-                  </div>
-                  <div className="text-sm text-gray-500">Original mint</div>
+            <div className="grid md:grid-cols-4 gap-6">
+              <div className="text-center">
+                <div className="text-lg font-semibold text-gray-400 mb-2">Total Supply</div>
+                <div className="text-2xl font-bold text-white">
+                  {formatNumber(TOTAL_SUPPLY)}
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-400 mb-2">Locked (Dev)</div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {formatNumber(supplyData.lockedSupply)}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {((supplyData.lockedSupply / supplyData.totalSupply) * 100).toFixed(1)}% locked
-                  </div>
+                <div className="text-sm text-gray-500">Original mint</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-semibold text-gray-400 mb-2">Locked (Dev)</div>
+                <div className="text-2xl font-bold text-green-400">
+                  {formatNumber(DEV_LOCKED)}
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-400 mb-2">Burned</div>
-                  <div className="text-2xl font-bold text-orange-400">
-                    {formatNumber(supplyData.burnedTokens)}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {burnPercentage.toFixed(3)}% burned
-                  </div>
+                <div className="text-sm text-gray-500">10% locked</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-semibold text-gray-400 mb-2">Burned</div>
+                <div className="text-2xl font-bold text-orange-400">
+                  {formatNumber(burnData?.totalTokensBurned || 0)}
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-400 mb-2">Circulating</div>
-                  <div className="text-2xl font-bold text-cyan-400">
-                    {formatNumber(supplyData.circulatingSupply)}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {((supplyData.circulatingSupply / supplyData.totalSupply) * 100).toFixed(1)}% circulating
-                  </div>
+                <div className="text-sm text-gray-500">
+                  {burnPercentage.toFixed(3)}% burned
                 </div>
               </div>
-            )}
+              
+              <div className="text-center">
+                <div className="text-lg font-semibold text-gray-400 mb-2">Circulating</div>
+                <div className="text-2xl font-bold text-cyan-400">
+                  {formatNumber(circulatingSupply)}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {((circulatingSupply / TOTAL_SUPPLY) * 100).toFixed(1)}% circulating
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -310,29 +284,23 @@ lockedSupply: lockedInfo.lockedAmount,
                               rel="noopener noreferrer"
                               className="text-orange-400 hover:text-orange-300 text-sm transition-colors bg-black/40 px-3 py-1 rounded font-mono"
                             >
-                              View Burn Tx ↗
+                              View Tx ↗
                             </a>
                           ) : (
                             <div className="text-gray-600 text-sm">
-                              TX Pending
+                              Pending
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                   ))}
-                  
-                  <div className="text-center pt-4">
-                    <Link href="/" className="text-orange-400 hover:text-orange-300 text-sm font-semibold transition-colors">
-                      View Full History on Homepage →
-                    </Link>
-                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-4">🔄</div>
                   <p className="text-gray-400">
-                    {burnData ? 'No burns recorded yet' : 'Loading burn history...'}
+                    No burns recorded yet. Burns will appear here once executed.
                   </p>
                 </div>
               )}
@@ -366,7 +334,7 @@ lockedSupply: lockedInfo.lockedAmount,
                   </div>
                 </div>
                 
-                {burnData.latestBurn.burnTx && (
+                {burnData.latestBurn.burnTx && burnData.latestBurn.burnTx.length > 10 && (
                   <div className="mt-6 text-center">
                     <a 
                       href={burnData.latestBurn.burnTx}
@@ -453,22 +421,20 @@ lockedSupply: lockedInfo.lockedAmount,
                   </div>
                 </div>
                 
-                {supplyData && (
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-300">Effective Circulating</span>
-                      <span className="text-blue-400 font-bold">
-                        {((supplyData.circulatingSupply / supplyData.totalSupply) * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-1000" 
-                        style={{width: `${(supplyData.circulatingSupply / supplyData.totalSupply) * 100}%`}}
-                      />
-                    </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-300">Effective Circulating</span>
+                    <span className="text-blue-400 font-bold">
+                      {((circulatingSupply / TOTAL_SUPPLY) * 100).toFixed(1)}%
+                    </span>
                   </div>
-                )}
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-1000" 
+                      style={{width: `${(circulatingSupply / TOTAL_SUPPLY) * 100}%`}}
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className="mt-4 p-3 bg-purple-900/20 rounded-lg border border-purple-500/20">
@@ -486,18 +452,18 @@ lockedSupply: lockedInfo.lockedAmount,
               
               <div className="space-y-3">
                 <div className="bg-black/40 rounded-lg p-3">
-                  <div className="text-green-400 text-sm font-semibold">✅ Verified Burns</div>
-                  <div className="text-gray-300 text-xs">All burns are on-chain and verifiable</div>
+                  <div className="text-green-400 text-sm font-semibold">✅ Google Sheets Tracking</div>
+                  <div className="text-gray-300 text-xs">All burns recorded in public spreadsheet</div>
                 </div>
                 
                 <div className="bg-black/40 rounded-lg p-3">
-                  <div className="text-green-400 text-sm font-semibold">✅ Real-time Tracking</div>
-                  <div className="text-gray-300 text-xs">Live data from blockchain and spreadsheets</div>
+                  <div className="text-green-400 text-sm font-semibold">✅ On-chain Verification</div>
+                  <div className="text-gray-300 text-xs">Transaction links for every burn</div>
                 </div>
                 
                 <div className="bg-black/40 rounded-lg p-3">
-                  <div className="text-green-400 text-sm font-semibold">✅ Public Records</div>
-                  <div className="text-gray-300 text-xs">Transaction links for every burn event</div>
+                  <div className="text-green-400 text-sm font-semibold">✅ Real-time Updates</div>
+                  <div className="text-gray-300 text-xs">Auto-refreshes every 30 seconds</div>
                 </div>
               </div>
             </div>

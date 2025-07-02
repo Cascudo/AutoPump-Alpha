@@ -196,10 +196,7 @@ const RewardsView: FC = () => {
             <div className="text-3xl font-bold text-green-400 mb-2">
               {rewardsData ? rewardsData.totalSolAwarded.toFixed(2) : '0.00'} SOL
             </div>
-            <div className="text-gray-400 text-sm">
-              Distributed to {rewardsData?.totalMembers.toLocaleString() || '0'} members
-            </div>
-          </div>
+         </div>
 
           <div className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 rounded-2xl p-6 border border-blue-500/20 text-center">
             <div className="text-4xl mb-4">🎯</div>
